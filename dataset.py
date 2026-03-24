@@ -1,6 +1,9 @@
 from torch.utils.data import Dataset
 from scipy.stats import zscore
-import os, glob, h5py
+import os, glob, h5py, torch
+from tqdm import tqdm 
+import numpy as np
+
 
 class NWBDataset(Dataset):
     def __init__(
@@ -17,22 +20,16 @@ class NWBDataset(Dataset):
         self.data_type = data_type
         self.channels_to_keep = channels_to_keep if channels_to_keep\
             is None else np.array(channels_to_keep)
-
         self.very_bad_elecs = very_bad_elecs
-
         self.samp_rate = 200
-        
         nwb_files = glob.glob(
             os.path.join(
                 self.root_dir, 'NZ*.nwb'
             )
         )
-
         if debug_mode:
             nwb_files = nwb_files[:3]
-
         self.data = []
-        
         for ii, nwb in enumerate(tqdm(nwb_files)):
             with h5py.File(
                 nwb, mode='r', libver='latest',
@@ -81,10 +78,17 @@ class NWBDataset(Dataset):
         nwb_idx, segment_idx = self.all_duration_segments[idx]
 
         norm_data = zscore(
-            self.data[nwb_idx][segment_idx*self.duration*200 : (segment_idx+1)*self.duration*200],
+            self.data[nwb_idx][segment_idx*self.duration*self.samp_rate : (segment_idx+1)*self.duration*self.samp_rate],
             axis=0
         )
-        
         tensor_data = torch.from_numpy(norm_data)
-
         return tensor_data
+
+
+if __name__ == "__main__":
+    ds = NWBDataset(root_dir="/depot/jgmakin/data/NZ0000/NWB/", data_type='both', duration=2, debug_mode='True') 
+    ## debug_mode = True only loads a small number of .nwb files for quick debugging
+    print(len(ds))
+    random_idx = np.random.randint(len(ds))
+    sample_eeg = ds[random_idx]
+    print(sample_eeg.shape)
