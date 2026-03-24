@@ -82,7 +82,7 @@ class NWBDataset(Dataset):
                 self.data.append(raw_data)
 
         num_of_duration_segments = [
-            len(dat)//self.samp_rate for dat in self.data
+            len(dat)//(self.duration * self.samp_rate) for dat in self.data
         ]
 
         self.all_duration_segments = [
