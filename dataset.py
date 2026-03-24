@@ -41,23 +41,23 @@ class NWBDataset(Dataset):
                 swmr=True
             ) as f:
                 if ii == 0:
-                    ekg_channels = raw_data['general']['extracellular_ephys']['electrodes']['bad'][:]
+                    ekg_channels = f['general']['extracellular_ephys']['electrodes']['bad'][:]
                 
                 if data_type.lower() == 'hg':
                     raw_data = f['processing']['ecephys']['LFP']\
                         ['high gamma (CAR 200.0Hz)']['data'][:, ~ekg_channels]
 
                     if self.samp_rate is None:
-                        self.samp_rate = f['processing']['ecephys']['LFP']\
-                        ['high gamma (CAR 200.0Hz)']['starting_time'].attrs['rate'].item()
+                        self.samp_rate = int(f['processing']['ecephys']['LFP']\
+                        ['high gamma (CAR 200.0Hz)']['starting_time'].attrs['rate'].item())
 
                 elif data_type.lower() == 'lfc':
                     raw_data = f['processing']['ecephys']['LFP']\
                         ['preprocessed LFC (CAR 200.0Hz)']['data'][:, ~ekg_channels]
 
                     if self.samp_rate is None:
-                        self.samp_rate = f['processing']['ecephys']['LFP']\
-                        ['preprocessed LFC (CAR 200.0Hz)']['starting_time'].attrs['rate'].item()
+                        self.samp_rate = int(f['processing']['ecephys']['LFP']\
+                        ['preprocessed LFC (CAR 200.0Hz)']['starting_time'].attrs['rate'].item())
                 elif data_type.lower() == 'both':
                     raw_data = np.concat(
                         (f['processing']['ecephys']['LFP']\
@@ -68,18 +68,16 @@ class NWBDataset(Dataset):
                     )
 
                     if self.samp_rate is None:
-                        hg_rate = f['processing']['ecephys']['LFP']\
-                        ['high gamma (CAR 200.0Hz)']['starting_time'].attrs['rate'].item()
-                        lfc_rate = f['processing']['ecephys']['LFP']\
-                        ['preprocessed LFC (CAR 200.0Hz)']['starting_time'].attrs['rate'].item()
+                        hg_rate = int(f['processing']['ecephys']['LFP']\
+                        ['high gamma (CAR 200.0Hz)']['starting_time'].attrs['rate'].item())
+                        lfc_rate = int(f['processing']['ecephys']['LFP']\
+                        ['preprocessed LFC (CAR 200.0Hz)']['starting_time'].attrs['rate'].item())
 
                         assert hg_rate == lfc_rate, "High Gamma and LFCs must have the same sampling rate."
 
                         self.samp_rate = hg_rate
                 else:
                     raise ValueError("data_type must be 'HG' or 'LFC' or 'Both'.")
-
-                raw_data = np.delete(raw_data, self.very_bad_elecs, axis=-1)
                 
                 self.data.append(raw_data)
 
