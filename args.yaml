@@ -1,0 +1,5 @@
+model:
+  n_layers: 3 
+
+data: 
+  dataroot: "/depot/jgmakin/data/NZ0000/NWB/"

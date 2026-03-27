@@ -1,13 +1,14 @@
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader, random_split, Subset
 from scipy.stats import zscore
 import os, glob, h5py, torch
 from tqdm import tqdm 
 import numpy as np
+import random 
 
 class NWBDataset(Dataset):
     def __init__(
-        self, root_dir, data_type='Both', duration=2,
-        channels_to_keep=None, debug_mode=False
+        self, root_dir="/depot/jgmakin/data/NZ0000/NWB/", data_type='Both', duration=2,
+        channels_to_keep=None, debug_mode=False, num_data_files=None, 
     ):
         """Dataset class for unlabeled data
         Args:
@@ -15,12 +16,15 @@ class NWBDataset(Dataset):
             duration (int): Length of a training sample in seconds
             channels_to_keep: Tell which channels to keep. Must be 0-indexed. Note: EKG channels...
             ... have already been removed internally in this class.
+        
+        Sample rate: 200Hz
+        Number of channels: 508
         """
         self.root_dir = root_dir
         self.duration = duration
         self.data_type = data_type
-        self.channels_to_keep = channels_to_keep if channels_to_keep\
-            is None else np.array(channels_to_keep)
+        self.num_data_files = num_data_files
+        self.channels_to_keep = channels_to_keep if channels_to_keep is None else np.array(channels_to_keep)
 
         self.samp_rate = None
         
@@ -36,6 +40,10 @@ class NWBDataset(Dataset):
         self.data = []
         
         for ii, nwb in enumerate(tqdm(nwb_files)):
+            # only select a number of data files 
+            if self.num_data_files is not None and ii >= self.num_data_files: 
+                break 
+            
             with h5py.File(
                 nwb, mode='r', libver='latest',
                 swmr=True
@@ -109,6 +117,69 @@ class NWBDataset(Dataset):
         tensor_data = torch.from_numpy(norm_data)
 
         return tensor_data
+
+def create_dataloader(
+        dataset: Dataset, 
+        train_ratio=0.8, 
+        train_val_ratio=0.1, 
+        batch_size=64, 
+        seed=42, 
+    ):
+    '''
+    return train_loader, train_val_loader, val_loader
+    '''
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    
+    # train val dataset 
+    train_size = int(train_ratio * len(dataset))
+    val_size = len(dataset) - train_size
+
+    train_dataset, val_dataset = random_split(
+        dataset,
+        [train_size, val_size],
+        generator=torch.Generator().manual_seed(seed)
+    )
+    
+    # train val dataset 
+    num_trainval = int(train_val_ratio * len(train_dataset))
+
+    # sample indices FROM train_dataset
+    all_indices = list(range(len(train_dataset)))
+    trainval_indices = random.sample(all_indices, num_trainval)
+
+    trainval_dataset = Subset(train_dataset, trainval_indices)
+    
+    
+    # dataloaders 
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True
+    )
+
+    train_val_loader = DataLoader(
+        trainval_dataset,
+        batch_size=batch_size,
+        shuffle=False
+    )
+
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False
+    )
+
+    print("\n\nFull dataset length:", len(dataset))
+    print("Train dataset length:", len(train_dataset))
+    print("Train_val dataset length:", len(trainval_dataset))
+    print("Val dataset length:", len(val_dataset), "\n\n")
+    
+    return train_loader, train_val_loader, val_loader
+
+
+
 
 
 if __name__ == "__main__":
